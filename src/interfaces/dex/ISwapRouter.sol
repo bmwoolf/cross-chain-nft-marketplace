@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity 0.8.16;
+
 pragma abicoder v2;
 
 /// @title Callback for IUniswapV3PoolActions#swap
@@ -41,7 +41,9 @@ interface ISwapRouter is IUniswapV3SwapCallback {
     function exactInputSingle(ExactInputSingleParams calldata params)
         external
         payable
-        returns (uint256 amountOut);
+        returns (
+            uint256 amountOut
+        );
 
     struct ExactInputParams {
         bytes path;
@@ -76,7 +78,9 @@ interface ISwapRouter is IUniswapV3SwapCallback {
     function exactOutputSingle(ExactOutputSingleParams calldata params)
         external
         payable
-        returns (uint256 amountIn);
+        returns (
+            uint256 amountIn
+        );
 
     struct ExactOutputParams {
         bytes path;

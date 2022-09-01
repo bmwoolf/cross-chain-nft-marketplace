@@ -1,4 +1,3 @@
-//SPDX-License-Identifier: MIT
 pragma solidity 0.8.16;
 
 import {IStargateReceiver} from "./interfaces/Stargate/IStargateReceiver.sol";
@@ -34,7 +33,6 @@ contract MarketplaceETH is IStargateReceiver, Ownable, MarketplaceEventsAndError
     /// @notice Current chain id
     uint16 public immutable currentChainId;
 
-    // TODO: pack/optimize
     uint256 public intConstant = 10000;
     uint256 public fee = 200;
 
@@ -105,26 +103,22 @@ contract MarketplaceETH is IStargateReceiver, Ownable, MarketplaceEventsAndError
     /// @param amountLD Amount of token received from the router
     /// @param payload Byte data composed of seller listing key and address to receive NFT
     function sgReceive(
-        uint16, /* chainId */
-        bytes memory, /* srcAddress */
-        uint256, /* nonce */
+        uint16,
+        bytes memory,
+        uint256,
         address token,
         uint256 amountLD,
         bytes memory payload
     ) external override {
-        // receive the message from stargate
         if (msg.sender != address(stargateRouter)) revert NotFromRouter();
 
-        // decode the payload from stargate
         (address collectionAddress, uint256 tokenId, address toAddress) = abi
             .decode(payload, (address, uint256, address));
 
-        // get item listing
         ItemListing memory listing = sellerListings[
             keccak256(abi.encodePacked(collectionAddress, tokenId))
         ];
 
-        /*We use try/catch so trasaction does not revert*/
         try
             this._executeBuy(
                 amountLD,
@@ -164,8 +158,6 @@ contract MarketplaceETH is IStargateReceiver, Ownable, MarketplaceEventsAndError
         if (listing.status != ListingStatus.ACTIVE_CROSSCHAIN)
             revert NotActiveGlobalListing();
 
-        // swap from usdc to native wrapped currency
-        // TODO: figure out where/when/how to unnwrap
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
             .ExactInputSingleParams({
                 tokenIn: address(USDC),
@@ -180,15 +172,9 @@ contract MarketplaceETH is IStargateReceiver, Ownable, MarketplaceEventsAndError
 
         uint256 amountOut = dexRouter.exactInputSingle(params);
 
-        // TODO: 1% tolerance? (30bps + 6bps + 30bps = 66bps, where does rest come from?)
-        // confirmed 994009006764002799, so approx 60 bps accounted for
-
         uint256 listingPriceWithTolerance = listing.price -
             ((listing.price * 100) / intConstant);
 
-        // if you dont get enough back, you send the buyer their eth back (means they didnt send enough money)
-        // FIXME: after swapping through Uniswap result is always less than price because of 30bps fee deduction
-        // amountOut + fees? (seller incurs fees if success, buyer if fail)
         if (amountOut < listingPriceWithTolerance) {
             // refund the buyer in full with native token
             // dexRouter.unwrapWETH9(amountOut, buyer);
@@ -255,32 +241,23 @@ contract MarketplaceETH is IStargateReceiver, Ownable, MarketplaceEventsAndError
         address toAddr,
         uint256 nativePrice
     ) external payable {
-        // address of marketplace to buy from
         bytes memory destAddr = marketplaceAddresses[chainId];
 
-        // add some extra gas
         IStargateRouter.lzTxObj memory lzParams = IStargateRouter.lzTxObj(
             500000,
             0,
             "0x"
         );
 
-        // encode the payload
         bytes memory payload = abi.encode(collectionAddress, tokenId, toAddr);
 
-        // estimate fees
         uint256 fee = quoteLayerZeroFee(chainId, payload, lzParams);
 
-        // currently in order to buy crosschain, buyer is forced to take on the messaging costs (confirm logic on this)
-        // frontend should tack on the messaging costs from quoteLayerZeroFee to the nativePrice
         if (msg.value < fee + nativePrice) revert InsufficientFunds();
         uint256 amountWithFee = nativePrice + fee;
 
-        // swap to USDC
         uint256 amountStable = _swapForPurchase(nativePrice);
 
-        // TODO: Add a poolId tracker for each chain
-        // swap to Stargate
         stargateRouter.swap{value: fee}(
             chainId,
             1,
@@ -340,12 +317,12 @@ contract MarketplaceETH is IStargateReceiver, Ownable, MarketplaceEventsAndError
     function buyLocal(
         address collectionAddress,
         uint256 tokenId,
-        address /* toAddr */
+        address
     ) external payable {
         ItemListing memory listing = sellerListings[
             keccak256(abi.encodePacked(collectionAddress, tokenId))
         ];
-        
+
         if (
             listing.status != ListingStatus.ACTIVE_LOCAL &&
             listing.status != ListingStatus.ACTIVE_CROSSCHAIN
@@ -353,7 +330,6 @@ contract MarketplaceETH is IStargateReceiver, Ownable, MarketplaceEventsAndError
         if (listing.price > msg.value) revert InsufficientFunds();
         if (listing.price < msg.value) revert ExcessFunds();
 
-        // collect fees
         uint256 listingPriceMinusFee = listing.price -
             (fee * listing.price) /
             intConstant;
@@ -426,7 +402,6 @@ contract MarketplaceETH is IStargateReceiver, Ownable, MarketplaceEventsAndError
     {
         bytes32 key = keccak256(abi.encodePacked(collectionAddress, tokenId));
 
-        // FIXME: compare gas with modifying struct directly
         ItemListing memory listing = sellerListings[key];
 
         listing.status = ListingStatus.INACTIVE;
@@ -489,12 +464,10 @@ contract MarketplaceETH is IStargateReceiver, Ownable, MarketplaceEventsAndError
         uint256 tokenId,
         uint256 newPrice
     ) external onlyTokenOwner(collectionAddress, tokenId) {
-        //TODO: should add msg.sender to this to make the hash more secure
         bytes32 key = keccak256(abi.encodePacked(collectionAddress, tokenId));
 
         ItemListing memory listing = sellerListings[key];
 
-        //TODO: check logic if this is necessary to add
         if (msg.sender != listing.lister) revert NotListingOwner();
         if (sellerListings[key].collectionAddress == address(0))
             revert NonexistentListing();
