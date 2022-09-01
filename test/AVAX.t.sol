@@ -1,48 +1,48 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.16;
 
-import {ETH} from "../src/ETH.sol";
+import {AVAX} from "../src/AVAX.sol";
 import {MockERC721} from "./mocks/MockERC721.sol";
 import {MarketplaceEventsAndErrors} from "../src/interfaces/MarketplaceEventsAndErrors.sol";
 import {ISwapRouter} from "../src/interfaces/dex/ISwapRouter.sol";
 import {IStargateRouter} from "../src/interfaces/Stargate/IStargateRouter.sol";
-import {IWETH9} from "../src/interfaces/IWETH9.sol";
+import {IWETH9 as IWAVAX} from "../src/interfaces/IWETH9.sol";
 
 import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 
 import "@std/Test.sol";
 
-contract ETHTest is Test {
+contract AVAXTest is Test {
     using stdStorage for StdStorage;
 
-    ETH marketplace;
+    AVAX marketplace;
     MockERC721 token;
     MockERC721 tokenUnapproved;
 
-    address public stargateRouter = 0x8731d54E9D02c286767d56ac03e8037C07e01e98;
-    address public stargateBridge = 0x9d1B1669c73b033DFe47ae5a0164Ab96df25B944;
-    address public dexRouter = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
-    address public usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    address public weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address public stargateRouter = 0x45A01E4e04F14f7A4a6702c74187c5F6222033cd;
+    address public stargateBridge = 0x296F55F8Fb28E498B858d0BcDA06D955B2Cb3f97;
+    address public dexRouter = 0x60aE616a2155Ee3d9A68541Ba4544862310933d4;
+    address public usdc = 0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E;
+    address public wavax = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7;
 
     address public constant owner = address(0x420);
     address public constant minter = address(0xBEEF);
     address public constant user = address(0x1337);
-    address public constant mockCrosschainMarketplaceAVAX = address(0xCAFE);
+    address public constant mockCrosschainMarketplaceETH = address(0xCAFE);
 
-    uint16 currentChainId = 1;
-    uint16 interactingChainId = 6;
+    uint16 currentChainId = 6;
+    uint16 interactingChainId = 1;
 
     function setUp() public {
         // console.log(unicode"🧪 Testing...");
         vm.prank(owner);
-        marketplace = new ETH(
+        marketplace = new AVAX(
             currentChainId,
             stargateRouter,
             dexRouter,
             usdc,
-            weth
+            wavax
         );
 
         token = new MockERC721();
@@ -51,7 +51,7 @@ contract ETHTest is Test {
         vm.prank(owner);
         marketplace.approveRouters();
 
-        vm.label(weth, "WETH9");
+        vm.label(wavax, "WAVAX");
         vm.label(usdc, "USDC");
 
         _mintSingle();
@@ -61,11 +61,11 @@ contract ETHTest is Test {
         assertEq(address(marketplace.stargateRouter()), stargateRouter);
         assertEq(address(marketplace.dexRouter()), dexRouter);
         assertEq(address(marketplace.USDC()), usdc);
-        assertEq(address(marketplace.wrappedNative()), weth);
+        assertEq(address(marketplace.wrappedNative()), wavax);
     }
 
     function testSetCrosschainMarketplace() public {
-        _setMarketplace(interactingChainId, mockCrosschainMarketplaceAVAX);
+        _setMarketplace(interactingChainId, mockCrosschainMarketplaceETH);
     }
 
     function testCannotSetCrosschainMarketplaceIfNotOwner() public {
@@ -73,7 +73,7 @@ contract ETHTest is Test {
         vm.expectRevert("Ownable: caller is not the owner");
         marketplace.setMarketplace(
             interactingChainId,
-            abi.encodePacked(mockCrosschainMarketplaceAVAX)
+            abi.encodePacked(mockCrosschainMarketplaceETH)
         );
     }
 
@@ -107,14 +107,14 @@ contract ETHTest is Test {
         vm.prank(user);
         marketplace.listItem(address(tokenUnapproved), 0, 1 ether, false);
 
-        (, , , , uint256 price, ETH.ListingStatus status) = marketplace
+        (, , , , uint256 price, AVAX.ListingStatus status) = marketplace
             .getSellerListings(
                 keccak256(
                     abi.encodePacked(address(tokenUnapproved), uint256(0))
                 )
             );
 
-        assert(status == ETH.ListingStatus.INACTIVE);
+        assert(status == AVAX.ListingStatus.INACTIVE);
     }
 
     function testEditSalePrice() public {
@@ -123,12 +123,12 @@ contract ETHTest is Test {
 
         vm.prank(minter);
         marketplace.editPrice(address(token), 0, 2 ether);
-        (, , , , uint256 price, ETH.ListingStatus status) = marketplace
+        (, , , , uint256 price, AVAX.ListingStatus status) = marketplace
             .getSellerListings(
                 keccak256(abi.encodePacked(address(token), uint256(0)))
             );
         assertEq(price, 2 ether);
-        assert(status == ETH.ListingStatus.ACTIVE_LOCAL);
+        assert(status == AVAX.ListingStatus.ACTIVE_LOCAL);
     }
 
     function testCannotEditSalePriceIfNotTokenOwner() public {
@@ -142,7 +142,7 @@ contract ETHTest is Test {
             )
         );
         marketplace.editPrice(address(token), 0, 2 ether);
-        (, , , , uint256 price, ETH.ListingStatus status) = marketplace
+        (, , , , uint256 price, AVAX.ListingStatus status) = marketplace
             .getSellerListings(
                 keccak256(abi.encodePacked(address(token), uint256(0)))
             );
@@ -179,11 +179,11 @@ contract ETHTest is Test {
         );
         marketplace.delistItem(address(token), 0);
 
-        (, , , , uint256 price, ETH.ListingStatus status) = marketplace
+        (, , , , uint256 price, AVAX.ListingStatus status) = marketplace
             .getSellerListings(
                 keccak256(abi.encodePacked(address(token), uint256(0)))
             );
-        assert(status == ETH.ListingStatus.ACTIVE_LOCAL);
+        assert(status == AVAX.ListingStatus.ACTIVE_LOCAL);
 
         vm.stopPrank();
     }
@@ -310,7 +310,7 @@ contract ETHTest is Test {
 
         vm.startPrank(stargateRouter);
 
-        (, , , , uint256 price, ETH.ListingStatus status) = marketplace
+        (, , , , uint256 price, AVAX.ListingStatus status) = marketplace
             .getSellerListings(
                 keccak256(abi.encodePacked(address(token), uint256(0)))
             );
@@ -338,11 +338,11 @@ contract ETHTest is Test {
             ((amountAfterFees * 50) / 10000);
 
         assertGt(
-            IERC20Metadata(weth).balanceOf(address(marketplace)),
+            IERC20Metadata(wavax).balanceOf(address(marketplace)),
             amountLowBound
         );
         assertLt(
-            IERC20Metadata(weth).balanceOf(address(marketplace)),
+            IERC20Metadata(wavax).balanceOf(address(marketplace)),
             amountUpperBound
         );
     }
@@ -367,11 +367,11 @@ contract ETHTest is Test {
     function _imitateWrapAndSwapStable() internal returns (uint256) {
         vm.startPrank(stargateRouter);
         vm.deal(stargateRouter, 1 ether);
-        IWETH9(weth).deposit{value: 1 ether}();
+        IWAVAX(wavax).deposit{value: 1 ether}();
 
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
             .ExactInputSingleParams({
-                tokenIn: weth,
+                tokenIn: wavax,
                 tokenOut: usdc,
                 fee: 3000,
                 recipient: address(marketplace),
@@ -381,7 +381,7 @@ contract ETHTest is Test {
                 sqrtPriceLimitX96: 0
             });
 
-        IERC20Metadata(weth).approve(address(dexRouter), 2**256 - 1);
+        IERC20Metadata(wavax).approve(address(dexRouter), 2**256 - 1);
         uint256 amountOut = ISwapRouter(dexRouter).exactInputSingle(params);
         vm.stopPrank();
 
@@ -399,11 +399,11 @@ contract ETHTest is Test {
         vm.prank(minter);
         marketplace.delistItem(address(token), 0);
 
-        (, , , , uint256 price, ETH.ListingStatus status) = marketplace
+        (, , , , uint256 price, AVAX.ListingStatus status) = marketplace
             .getSellerListings(
                 keccak256(abi.encodePacked(address(token), uint256(0)))
             );
-        assert(status == ETH.ListingStatus.INACTIVE);
+        assert(status == AVAX.ListingStatus.INACTIVE);
     }
 
     function _listItemCrosschain() internal {
@@ -411,7 +411,7 @@ contract ETHTest is Test {
 
         vm.prank(minter);
         marketplace.listItem(address(token), 0, 1 ether, true);
-        (, , , , uint256 price, ETH.ListingStatus status) = marketplace
+        (, , , , uint256 price, AVAX.ListingStatus status) = marketplace
             .getSellerListings(
                 keccak256(abi.encodePacked(address(token), uint256(0)))
             );
@@ -421,7 +421,7 @@ contract ETHTest is Test {
 
         assert(token.isApprovedForAll(minter, address(marketplace)));
         assertEq(price, 1 ether);
-        assert(status == ETH.ListingStatus.ACTIVE_CROSSCHAIN);
+        assert(status == AVAX.ListingStatus.ACTIVE_CROSSCHAIN);
     }
 
     function _listItemLocally() internal {
@@ -429,7 +429,7 @@ contract ETHTest is Test {
 
         vm.prank(minter);
         marketplace.listItem(address(token), 0, 1 ether, false);
-        (, , , , uint256 price, ETH.ListingStatus status) = marketplace
+        (, , , , uint256 price, AVAX.ListingStatus status) = marketplace
             .getSellerListings(
                 keccak256(abi.encodePacked(address(token), uint256(0)))
             );
@@ -439,7 +439,7 @@ contract ETHTest is Test {
 
         assert(token.isApprovedForAll(minter, address(marketplace)));
         assertEq(price, 1 ether);
-        assert(status == ETH.ListingStatus.ACTIVE_LOCAL);
+        assert(status == AVAX.ListingStatus.ACTIVE_LOCAL);
     }
 
     function _approveContract(address contractAddress) internal {
