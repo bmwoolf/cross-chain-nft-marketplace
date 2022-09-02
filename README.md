@@ -10,3 +10,4 @@ ETH contract <--> Uniswap <--> Stargate <--> Trader Joe <--> AVAX contract
 [] ERC20 swaps with pricing   
 [] ci/cd   
 [] modularize chains (chain-specific dex passed in as params)   
+[] frontend white label
